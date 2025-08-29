@@ -1,0 +1,103 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-08-28T16:00:00.000Z",
+  "__export_source": "chatgpt-scaffold",
+  "resources": [
+    {
+      "_id": "wrk_wallpaper_project",
+      "_type": "workspace",
+      "name": "Wallpaper Project API",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_local_dev",
+      "_type": "environment",
+      "parentId": "wrk_wallpaper_project",
+      "modified": 0,
+      "created": 0,
+      "name": "Local Dev",
+      "data": {
+        "base_url": "http://localhost:5000/api",
+        "jwt": "REPLACE_WITH_YOUR_JWT"
+      }
+    },
+    {
+      "_id": "req_seed_admin",
+      "_type": "request",
+      "parentId": "wrk_wallpaper_project",
+      "name": "Seed Admin",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/seed-admin",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+      }
+    },
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "wrk_wallpaper_project",
+      "name": "Login",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/login",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"email\": \"admin@example.com\",\n  \"password\": \"admin123\"\n}"
+      }
+    },
+    {
+      "_id": "req_list_products",
+      "_type": "request",
+      "parentId": "wrk_wallpaper_project",
+      "name": "List Products",
+      "method": "GET",
+      "url": "{{ base_url }}/products"
+    },
+    {
+      "_id": "req_create_product",
+      "_type": "request",
+      "parentId": "wrk_wallpaper_project",
+      "name": "Create Product (admin)",
+      "method": "POST",
+      "url": "{{ base_url }}/products",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt }}" }
+      ]
+    },
+    {
+      "_id": "req_delete_product",
+      "_type": "request",
+      "parentId": "wrk_wallpaper_project",
+      "name": "Delete Product (admin)",
+      "method": "DELETE",
+      "url": "{{ base_url }}/products/{{ product_id }}",
+      "headers": [
+        { "name": "Authorization", "value": "Bearer {{ jwt }}" }
+      ]
+    },
+    {
+      "_id": "req_checkout_session",
+      "_type": "request",
+      "parentId": "wrk_wallpaper_project",
+      "name": "Create Checkout Session",
+      "method": "POST",
+      "url": "{{ base_url }}/checkout/create-session",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"productId\": \"{{ product_id }}\"\n}"
+      }
+    },
+    {
+      "_id": "env_variables",
+      "_type": "environment",
+      "parentId": "env_local_dev",
+      "modified": 0,
+      "created": 0,
+      "name": "Variables",
+      "data": {
+        "product_id": "REPLACE_WITH_PRODUCT_ID"
+      }
+    }
+  ]
+}
