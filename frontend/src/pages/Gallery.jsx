@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { useSearchParams } from 'react-router-dom';
+import { toastError } from '../lib/toast.js';
 
-const CATEGORIES = ['Nature', 'Abstract', 'Minimal'];
+const CATEGORIES = ['Nature', 'Abstract', 'Technology', 'Animals', 'Holiday'];
 
 export default function Gallery() {
   const [items, setItems] = useState([]);
@@ -34,16 +35,16 @@ export default function Gallery() {
     try {
       const { data } = await api.post('/checkout/create-session', { productId: item._id });
       window.location.href = data.url;
-    } catch {
-      alert('Could not start checkout. Please try again.');
+    } catch (e) {
+      toastError('Could not start checkout. Please try again.');
     }
   };
 
   return (
     <>
       <div className="text-center mb-6">
-        <h1 className="text-3xl text-gray-600 font-bold">Screen Tones</h1>
-        <p className="text-gray-600 mt-1">Discover Your Tone.</p>
+        <h1 className="text-3xl text-gray-600 font-bold">ScreenTones</h1>
+        <p className="text-gray-600 mt-1">Capture Your Tone.</p>
       </div>
 
       <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
@@ -53,7 +54,7 @@ export default function Gallery() {
           {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
         {category && (
-          <button className="text-sm underline text-gray-600" onClick={()=>setCategory('')}>Clear</button>
+          <button className="w-full sm:w-auto px-3 py-3 rounded-lg bg-gray-200 hover:bg-gray-300 text-sm" onClick={()=>setCategory('')}>Clear</button>
         )}
       </div>
 
