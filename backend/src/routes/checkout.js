@@ -1,71 +1,78 @@
+// backend/src/routes/checkout.js
 import { Router } from 'express';
 import Stripe from 'stripe';
 import Product from '../models/Product.js';
-import Order from '../models/Order.js';
+import { auth } from '../middleware/auth.js';
 
 const router = Router();
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
-// Create Stripe Checkout Session (test mode)
-router.post('/create-session', async (req, res) => {
-  console.log('DEBUG checkout body:', req.body);           // <- show what arrived
-
+/**
+ * POST /api/checkout/create-session
+ * Body: { productId }
+ * Auth: required
+ *
+ * Redirects to Stripe Checkout. On payment completion, Stripe redirects back to:
+ *   <CLIENT_URL>/success?session_id={CHECKOUT_SESSION_ID}
+ * On cancel:
+ *   <CLIENT_URL>/cancel
+ */
+router.post('/create-session', auth, async (req, res) => {
   try {
     const { productId } = req.body;
-        console.log('DEBUG productId:', productId);            // <- show extracted value
+    if (!productId) {
+      return res.status(400).json({ message: 'productId required' });
+    }
 
     const product = await Product.findById(productId);
-        console.log('DEBUG product:', !!product);              // <- true/false
+    if (!product) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
 
-    if (!product) return res.status(404).json({ message: 'Product not found' });
+    // IMPORTANT: set CLIENT_URL in backend .env (e.g., http://localhost:5173)
+    const successUrl = `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${process.env.CLIENT_URL}/cancel`;
 
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: { name: product.title, images: [product.imageUrl] },
-            unit_amount: product.price
+const session = await stripe.checkout.sessions.create({
+  mode: 'payment',
+  payment_method_types: ['card'],
+  line_items: [
+    {
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: product.title,
+          images: [product.imageUrl],
+          metadata: {
+            productId: product._id.toString(), // <-- for confirm step
           },
-          quantity: 1
-        }
-      ],
-      success_url: `${process.env.FRONTEND_URL}/success?productId=${product._id}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.FRONTEND_URL}/cancel`
-    });
+        },
+        unit_amount: Number(product.price),
+      },
+      quantity: 1,
+    },
+  ],
 
-    res.json({ url: session.url });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
-  }
+  // Send the user back WITH the session id in the URL
+  success_url: `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+  cancel_url: `${process.env.CLIENT_URL}/cancel`,
+
+  // So we can correlate on the server when confirming
+  customer_email: req.user?.email || undefined,
+  metadata: {
+    productId: product._id.toString(),
+    userId: req.user?.id || '', // <-- must be non-empty & match your JWT payload id
+  },
 });
 
-// (Optional MVP+) Record order after redirect using session_id
-router.get('/record', async (req, res) => {
-  try {
-    const { session_id, productId } = req.query;
-    if (!session_id) return res.status(400).json({ message: 'session_id required' });
-    const session = await stripe.checkout.sessions.retrieve(session_id);
-    if (session.payment_status !== 'paid') return res.status(400).json({ message: 'Not paid' });
 
-    const exists = await Order.findOne({ stripeSessionId: session_id });
-    if (!exists) {
-      await Order.create({
-        email: session.customer_details?.email,
-        product: productId,
-        amount: session.amount_total,
-        currency: session.currency,
-        stripeSessionId: session.id,
-        status: 'paid'
-      });
-    }
-    res.json({ ok: true });
-  } catch (e) {
-    res.status(500).json({ message: e.message });
+    return res.json({ id: session.id, url: session.url });
+  } catch (err) {
+    console.error('create-session error:', err);
+    return res.status(500).json({ message: 'Stripe session failed' });
   }
 });
 
 export default router;
+
 

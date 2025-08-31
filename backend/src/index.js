@@ -10,6 +10,7 @@ import checkoutRoutes from './routes/checkout.js';
 import ordersRoutes from './routes/orders.js';
 import usersRoutes from './routes/users.js';
 
+
 required([
   'MONGO_URI',
   'JWT_SECRET',
@@ -17,6 +18,7 @@ required([
   'CLOUDINARY_API_KEY',
   'CLOUDINARY_API_SECRET',
   'STRIPE_SECRET_KEY',
+    'CLIENT_URL',
   'FRONTEND_URL'
 ]);
 
