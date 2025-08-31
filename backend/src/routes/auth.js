@@ -2,7 +2,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
-import { auth as requireAuth } from '../middleware/auth.js';
+import { auth, auth as requireAuth } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -84,5 +84,18 @@ router.get('/me', requireAuth, async (req, res) => {
     return res.status(500).json({ message: 'Failed to fetch profile' });
   }
 });
+
+// DELETE /api/auth/me  (self-delete)
+router.delete('/me', auth, async (req, res) => {
+  try {
+    const u = await User.findById(req.user.id);
+    if (!u) return res.status(404).json({ message: 'User not found' });
+    await u.deleteOne();
+    return res.json({ message: 'Account deleted' });
+  } catch {
+    return res.status(500).json({ message: 'Failed to delete account' });
+  }
+});
+
 
 export default router;
