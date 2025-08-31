@@ -8,6 +8,7 @@ import authRoutes from './routes/auth.js';
 import productRoutes from './routes/products.js';
 import checkoutRoutes from './routes/checkout.js';
 import ordersRoutes from './routes/orders.js';
+import usersRoutes from './routes/users.js';
 
 required([
   'MONGO_URI',
@@ -30,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/orders', ordersRoutes);
+app.use('/api/users', usersRoutes);
 
 const PORT = process.env.PORT || 5000;
 
