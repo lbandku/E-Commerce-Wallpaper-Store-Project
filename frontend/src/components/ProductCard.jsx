@@ -23,7 +23,7 @@ export default function ProductCard({ item, onBuy }) {
       <div className="p-4 text-center">
         <div className="mb-1 inline-flex items-center gap-2 justify-center">
           {item.category && (
-            <span className="inline-block text-[11px] uppercase tracking-wide bg-gray-900 text-gray-100 px-2 py-1 rounded">
+            <span className="font-semibold inline-block text-[11px] uppercase tracking-wide bg-gray-200 text-gray-900 px-3 py-1 rounded">
               {item.category}
             </span>
           )}
@@ -65,3 +65,4 @@ export default function ProductCard({ item, onBuy }) {
     </article>
   );
 }
+
