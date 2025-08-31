@@ -45,6 +45,7 @@ export default function App() {
             />
             <Route path="/cart" element={<Cart />} />
             <Route path="/orders/my" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+            <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} />
           </Routes>
         </div>
       </main>
