@@ -1,26 +1,31 @@
 // backend/src/models/Order.js
 import mongoose from 'mongoose';
 
-const orderItemSchema = new mongoose.Schema(
+const OrderItemSchema = new mongoose.Schema(
   {
-    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    title: String,
-    imageUrl: String,
-    price: { type: Number, required: true }, // price snapshot in cents
+    product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    title: { type: String, required: true },
+    imageUrl: { type: String, default: '' },
+    price: { type: Number, required: true }, // stored in cents
   },
   { _id: false }
 );
 
-const orderSchema = new mongoose.Schema(
+const OrderSchema = new mongoose.Schema(
   {
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    items: { type: [orderItemSchema], required: true },
-    total: { type: Number, required: true }, // total in cents
-    status: { type: String, enum: ['pending', 'completed', 'canceled'], default: 'completed' },
-    // stripeSessionId: String, // to be used later with real Stripe webhooks
+    items: { type: [OrderItemSchema], default: [], required: true },
+    total: { type: Number, required: true }, // cents
+    status: {
+      type: String,
+      enum: ['pending', 'paid', 'completed', 'failed', 'refunded', 'cancelled'],
+      default: 'paid', // or can be set as 'pending'
+      required: true,
+    },
+    stripeSessionId: { type: String, index: true, unique: true, sparse: true },
   },
   { timestamps: true }
 );
 
-export default mongoose.model('Order', orderSchema);
+export default mongoose.model('Order', OrderSchema);
 
