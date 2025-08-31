@@ -1,34 +1,80 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { api, setAuthToken } from '../lib/api.js';
+
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { api } from '../lib/api.js';
 
 const AuthCtx = createContext(null);
-export const useAuth = () => useContext(AuthCtx);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(localStorage.getItem('jwt') || null);
-  const [role, setRole] = useState(localStorage.getItem('role') || 'user');
+  const [token, setToken] = useState(() => localStorage.getItem('token') || '');
+  const [user, setUser] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('user') || 'null'); } catch { return null; }
+  });
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => { setAuthToken(token); }, [token]);
+  // Bootstrap session from token -> /auth/me
+  useEffect(() => {
+    let alive = true;
+    const boot = async () => {
+      if (!token) { setUser(null); return; }
+      try {
+        const { data } = await api.get('/auth/me');
+        if (alive) setUser(data?.user ?? null);
+      } catch {
+        // invalid/expired token
+        if (alive) {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setToken('');
+          setUser(null);
+        }
+      }
+    };
+    boot();
+    return () => { alive = false; };
+  }, [token]);
 
   const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    setToken(data.token);
-    localStorage.setItem('jwt', data.token);
-    // Minimal: treat login as admin for dashboard access after seeding
-    setRole('admin'); localStorage.setItem('role','admin');
+    setLoading(true);
+    try {
+      const { data } = await api.post('/auth/login', { email, password });
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+      return data.user;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const register = async ({ email, name, password }) => {
+    setLoading(true);
+    try {
+      const { data } = await api.post('/auth/register', { email, name, password });
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      setToken(data.token);
+      setUser(data.user);
+      return data.user;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const logout = () => {
-    setToken(null); setRole('user');
-    localStorage.removeItem('jwt'); localStorage.removeItem('role');
-    setAuthToken(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken('');
+    setUser(null);
   };
 
-  return (
-    <AuthCtx.Provider value={{ token, role, login, logout }}>
-      {children}
-    </AuthCtx.Provider>
-  );
+  const value = useMemo(() => ({
+    token, user, isAdmin: user?.role === 'admin', loading, login, register, logout
+  }), [token, user, loading]);
+
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
-
+export function useAuth() {
+  return useContext(AuthCtx);
+}
