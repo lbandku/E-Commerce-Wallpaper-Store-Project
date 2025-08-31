@@ -12,6 +12,9 @@ import CheckoutCancel from './pages/CheckoutCancel.jsx';
 import ProtectedRoute from './components/ProtectedRoute.jsx';
 import { Toaster } from 'react-hot-toast';
 import Cart from './pages/Cart.jsx';
+import MyOrders from './pages/MyOrders.jsx';
+import AdminUsers from './pages/AdminUsers.jsx';
+import Account from './pages/Account.jsx';
 
 export default function App() {
   return (
@@ -42,6 +45,9 @@ export default function App() {
               }
             />
             <Route path="/cart" element={<Cart />} />
+            <Route path="/orders/my" element={<ProtectedRoute><MyOrders /></ProtectedRoute>} />
+            <Route path="/admin/users" element={<ProtectedRoute role="admin"><AdminUsers /></ProtectedRoute>} />
+            <Route path="/account" element={<ProtectedRoute><Account /></ProtectedRoute>} />
           </Routes>
         </div>
       </main>

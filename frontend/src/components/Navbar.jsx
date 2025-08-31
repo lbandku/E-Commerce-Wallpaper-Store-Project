@@ -34,6 +34,14 @@ export default function Navbar() {
             <Link to="/admin" className={navLink}>Admin</Link>
           )}
 
+          {/* Just added, needs test: Show Orders (user history) and Account when logged in */}
+          {token && (
+          <>
+            <Link to="/orders/my" className={navLink}>Orders</Link>
+            <Link to="/account" className={navLink}>Account</Link>
+          </>
+          )}
+
           {/* Auth area */}
           {token ? (
             <span
