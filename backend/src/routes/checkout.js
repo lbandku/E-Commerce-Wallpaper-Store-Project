@@ -30,8 +30,8 @@ router.post('/create-session', auth, async (req, res) => {
     }
 
     // IMPORTANT: set CLIENT_URL in backend .env (e.g., http://localhost:5173)
-    const successUrl = `${process.env.CLIENT_URL}/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${process.env.CLIENT_URL}/cancel`;
+    const successUrl = `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${process.env.FRONTEND_URL}/cancel`;
 
 const session = await stripe.checkout.sessions.create({
   mode: 'payment',
