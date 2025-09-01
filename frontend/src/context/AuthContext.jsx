@@ -1,89 +1,86 @@
 // frontend/src/context/AuthContext.jsx
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { api } from '../lib/api.js';
-import { toastSuccess, toastError } from '../lib/toast.js';
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import api from "../lib/api.js";
 
-const AuthCtx = createContext(null);
+const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(null);
-  const [user, setUser]   = useState(null);
-  const [ready, setReady] = useState(false);
+  const [token, setToken] = useState(() => localStorage.getItem("token") || "");
+  const [user, setUser] = useState(() => {
+    const raw = localStorage.getItem("user");
+    try { return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
+  const [loading, setLoading] = useState(false);
 
-  // helpers to sync axios header + localStorage
-  const applyToken = useCallback((t) => {
-    if (t) {
-      localStorage.setItem('jwt', t);
-      api.defaults.headers.Authorization = `Bearer ${t}`;
-      setToken(t);
-    } else {
-      localStorage.removeItem('jwt');
-      delete api.defaults.headers.Authorization;
-      setToken(null);
-    }
-  }, []);
-
-  // rehydrate on mount
+  // Keep axios Authorization header in sync
   useEffect(() => {
-    const t = localStorage.getItem('jwt');
-    if (!t) { setReady(true); return; }
-    applyToken(t);
-    // fetch current user
-    (async () => {
-      try {
-        const { data } = await api.get('/auth/me');
-        setUser(data);
-      } catch {
-        // token invalid -> clear it
-        applyToken(null);
-      } finally {
-        setReady(true);
-      }
-    })();
-  }, [applyToken]);
+    if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`;
+    else delete api.defaults.headers.common.Authorization;
+  }, [token]);
 
-  const login = useCallback(async (email, password) => {
+  const saveAuth = (t, u) => {
+    setToken(t || "");
+    setUser(u || null);
+    if (t) localStorage.setItem("token", t); else localStorage.removeItem("token");
+    if (u) localStorage.setItem("user", JSON.stringify(u)); else localStorage.removeItem("user");
+  };
+
+  const login = async (email, password) => {
+    setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      // backend should return { token, user }
-      applyToken(data.token);
-      setUser(data.user || null);
-      toastSuccess('Logged in');
-      return data;
-    } catch (e) {
-      toastError(e?.response?.data?.message || 'Login failed');
-      throw e;
+      // ✅ Make sure your backend supports this path
+      const { data } = await api.post("/api/auth/login", { email, password });
+      // expected shape: { token, user }
+      saveAuth(data.token, data.user);
+      return data.user;
+    } finally {
+      setLoading(false);
     }
-  }, [applyToken]);
+  };
 
-  const register = useCallback(async (payload) => {
+  const register = async ({ name, email, password }) => {
+    setLoading(true);
     try {
-      const { data } = await api.post('/auth/register', payload);
-      // optionally auto-login if your backend returns token
-      if (data.token) {
-        applyToken(data.token);
-        setUser(data.user || null);
-        toastSuccess('Account created');
-      } else {
-        toastSuccess('Account created, please log in');
-      }
-      return data;
-    } catch (e) {
-      toastError(e?.response?.data?.message || 'Registration failed');
-      throw e;
+      const { data } = await api.post("/api/auth/register", { name, email, password });
+      // optional: auto-login after register if backend returns {token,user}
+      if (data?.token && data?.user) saveAuth(data.token, data.user);
+      return data.user ?? null;
+    } finally {
+      setLoading(false);
     }
-  }, [applyToken]);
+  };
 
-  const logout = useCallback(() => {
-    applyToken(null);
-    setUser(null);
-    toastSuccess('Logged out');
-  }, [applyToken]);
+  const fetchMe = async () => {
+    if (!token) return null;
+    try {
+      const { data } = await api.get("/api/auth/me");
+      setUser(data);
+      localStorage.setItem("user", JSON.stringify(data));
+      return data;
+    } catch {
+      // token bad/expired → clear
+      saveAuth("", null);
+      return null;
+    }
+  };
 
-  const value = { ready, user, token, login, register, logout };
-  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
+  const logout = async () => {
+    // (Optional) await api.post("/api/auth/logout");
+    saveAuth("", null);
+  };
+
+  useEffect(() => { fetchMe(); }, []); // keep if your backend exposes /me
+
+  const value = useMemo(() => ({
+    token, user, loading,
+    login, register, logout, fetchMe
+  }), [token, user, loading]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
-  return useContext(AuthCtx);
-}
+export const useAuth = () => {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
+  return ctx;
+};
