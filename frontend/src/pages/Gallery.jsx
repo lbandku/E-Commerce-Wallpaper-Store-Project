@@ -1,3 +1,4 @@
+// frontend/src/pages/Gallery.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import ProductCard from '../components/ProductCard.jsx';
@@ -39,8 +40,9 @@ export default function Gallery() {
 
   useEffect(() => {
     let ok = true;
-    setLoading(true); setErr('');
-    api.get(`/products/search${queryString}`)
+    setLoading(true);
+    setErr('');
+    api.get(`/api/products/search${queryString}`)
       .then(({ data }) => {
         if (!ok) return;
         setItems(data.items || []);
@@ -59,7 +61,7 @@ export default function Gallery() {
   const buy = async (item) => {
     try {
       sessionStorage.setItem('lastProductId', item._id);
-      const { data } = await api.post('/checkout/create-session', { productId: item._id });
+      const { data } = await api.post('/api/checkout/create-session', { productId: item._id });
       window.location.href = data.url;
     } catch {
       toastError('Could not start checkout. Please try again.');
@@ -166,4 +168,7 @@ export default function Gallery() {
     </>
   );
 }
+
+
+
 
