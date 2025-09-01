@@ -1,158 +1,351 @@
-import React, { useEffect, useState } from 'react';
-import { api } from '../lib/api.js';
-import { toastSuccess, toastError } from '../lib/toast.js';
+// frontend/src/pages/AdminDashboard.jsx
+import React, { useEffect, useRef, useState } from 'react';
+import api from '../lib/api.js';
+import { toastError, toastSuccess } from '../lib/toast.js';
 
-const CATEGORIES = ['Nature', 'Abstract', 'Technology', 'Animals', 'Holiday'];
+const CATEGORIES = ['Nature', 'Abstract', 'Minimal', 'Technology', 'Animals', 'Holiday'];
 
 export default function AdminDashboard() {
-  const [form, setForm] = useState({
-    title: '',
-    category: '',
-    price: 199,
-    image: null,
-    description: ''
-  });
-  const [preview, setPreview] = useState(null);
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab] = useState('products'); // 'products' | 'orders'
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
 
-  const load = async () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Upload form state
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('');
+  const [priceUSD, setPriceUSD] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageFile, setImageFile] = useState(null);
+  const fileInputRef = useRef(null);
+
+  const fetchProducts = async () => {
+    setError('');
     try {
-      const { data } = await api.get('/products');
-      setItems(data);
-    } catch (err) {
-      toastError('Failed to load products');
+      const { data } = await api.get('/api/products', { params: { sort: 'newest', limit: 100 } });
+      setProducts(Array.isArray(data) ? data : data?.items || []);
+    } catch (e) {
+      const msg = e?.response?.data?.message || 'Failed to load products';
+      setError(msg);
+      toastError(msg);
     }
   };
 
-  useEffect(() => { load(); }, []);
+  const fetchOrders = async () => {
+    setError('');
+    try {
+      const { data } = await api.get('/api/orders');
+      setOrders(Array.isArray(data) ? data : data?.orders || []);
+    } catch (e) {
+      const msg = e?.response?.data?.message || 'Failed to load orders';
+      setError(msg);
+      toastError(msg);
+    }
+  };
 
-  const submit = async (e) => {
+  useEffect(() => {
+    setLoading(true);
+    const loader = tab === 'products' ? fetchProducts() : fetchOrders();
+    Promise.resolve(loader).finally(() => setLoading(false));
+  }, [tab]);
+
+  const resetForm = () => {
+    setTitle('');
+    setCategory('');
+    setPriceUSD('');
+    setDescription('');
+    setImageFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const submitUpload = async (e) => {
     e.preventDefault();
+    if (!title || !category || !priceUSD || !imageFile) {
+      toastError('Please complete all fields and choose an image.');
+      return;
+    }
+    const cents = Math.round(Number(priceUSD) * 100);
+    if (!Number.isFinite(cents) || cents <= 0) {
+      toastError('Price must be a positive number.');
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('category', category);
+    fd.append('price', String(cents));
+    fd.append('description', description);
+    fd.append('image', imageFile);
+
     setLoading(true);
     try {
-      const fd = new FormData();
-      fd.append('title', form.title);
-      fd.append('category', form.category);
-      fd.append('price', form.price);
-      fd.append('description', form.description);
-      if (form.image) fd.append('image', form.image);
-
-      await api.post('/products', fd, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      toastSuccess('Wallpaper uploaded');
-      setForm({ title: '', category: '', price: 199, image: null, description: '' });
-      setPreview(null);
-      load();
-    } catch (err) {
-      toastError('Upload failed');
+      await api.post('/api/products', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toastSuccess('Product created');
+      resetForm();
+      await fetchProducts();
+    } catch (e2) {
+      const msg = e2?.response?.data?.message || 'Create failed';
+      toastError(msg);
     } finally {
       setLoading(false);
     }
   };
 
-  const delItem = async (id) => {
+  const deleteProduct = async (id) => {
+    const yes = window.confirm('Delete this product? This cannot be undone.');
+    if (!yes) return;
+    setLoading(true);
     try {
-      await api.delete(`/products/${id}`);
-      toastSuccess('Wallpaper deleted');
-      load();
-    } catch (err) {
-      toastError('Delete failed');
+      await api.delete(`/api/products/${id}`);
+      toastSuccess('Deleted');
+      await fetchProducts();
+    } catch (e) {
+      const msg = e?.response?.data?.message || 'Delete failed';
+      toastError(msg);
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Reusable dark button class (white text in both themes)
+  const darkBtn = 'px-3 py-2 rounded border bg-gray-900 text-white hover:bg-gray-800';
+
   return (
-    <div className="w-full max-w-7xl mx-auto py-6 text-gray-900">
-      <h2 className="text-2xl font-bold mb-6 text-gray-900">Admin Dashboard</h2>
+    <div className="max-w-6xl mx-auto">
+      <h1 className="text-2xl font-semibold mb-4 text-gray-900">Admin Dashboard</h1>
 
-      {/* Upload Form */}
-      <form onSubmit={submit} className="bg-white shadow rounded-xl p-6 mb-10 text-gray-900">
-        <h3 className="font-semibold mb-3 text-gray-800">Add Wallpaper</h3>
-
-        <input
-          className="border p-3 w-full mb-3 rounded text-gray-900 placeholder-gray-500"
-          placeholder="Title"
-          value={form.title}
-          onChange={(e) => setForm({ ...form, title: e.target.value })}
-          required
-        />
-
-        <select
-          className="border p-3 w-full mb-3 rounded text-gray-900"
-          value={form.category}
-          onChange={(e) => setForm({ ...form, category: e.target.value })}
-          required
-        >
-          <option value="">Select category</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-
-        <input
-          type="number"
-          className="border p-3 w-full mb-3 rounded text-gray-900"
-          placeholder="Price in cents"
-          value={form.price}
-          onChange={(e) => setForm({ ...form, price: e.target.value })}
-        />
-
-        <textarea
-          className="border p-3 w-full mb-3 rounded text-gray-900 placeholder-gray-500"
-          placeholder="Description"
-          value={form.description}
-          onChange={(e) => setForm({ ...form, description: e.target.value })}
-        />
-
-        {/* File input styled as a button-like control */}
-        <label className="inline-block mb-3 cursor-pointer px-3 py-2 rounded-lg text-sm font-medium border border-gray-400 text-gray-900 bg-white hover:bg-gray-200 transition">
-          Choose Image
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files[0];
-              setForm({ ...form, image: file });
-              if (file) setPreview(URL.createObjectURL(file));
-            }}
-          />
-        </label>
-
-        {preview && (
-          <img src={preview} alt="preview" className="mb-3 max-h-40 rounded border" />
-        )}
-
+      {/* Tabs */}
+      <div className="mb-5 flex gap-2">
         <button
-          disabled={loading}
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded"
+          className={darkBtn}
+          onClick={() => setTab('products')}
         >
-          {loading ? 'Uploading...' : 'Upload'}
+          Products
         </button>
-      </form>
-
-      {/* Product List */}
-      <h3 className="font-semibold mb-3 text-gray-800">Existing Wallpapers</h3>
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-        {items.map((it) => (
-          <div key={it._id} className="bg-white shadow rounded-xl p-4 text-gray-900">
-            <img src={it.imageUrl} alt={it.title} className="mb-2 rounded" />
-            <h4 className="font-semibold text-gray-900">{it.title}</h4>
-            <p className="text-sm text-gray-700 mb-2">{it.description}</p>
-            <p className="text-sm text-gray-700 mb-2">
-              {it.category} — ${(it.price / 100).toFixed(2)}
-            </p>
-            <button
-              onClick={() => delItem(it._id)}
-              className="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm"
-            >
-              Delete
-            </button>
-          </div>
-        ))}
+        <button
+          className={darkBtn}
+          onClick={() => setTab('orders')}
+        >
+          Orders
+        </button>
       </div>
+
+      {loading && <div className="text-gray-600">Loading…</div>}
+      {!loading && error && <div className="text-red-600 mb-4">{error}</div>}
+
+      {/* PRODUCTS */}
+      {!loading && !error && tab === 'products' && (
+        <>
+          {/* Upload form */}
+          <form onSubmit={submitUpload} className="bg-white rounded-xl border border-gray-200 p-6 mb-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900">Upload New Product</h2>
+
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Title</label>
+              <input
+                className="border rounded w-full p-2 text-gray-900"
+                value={title}
+                onChange={(e)=>setTitle(e.target.value)}
+                placeholder="e.g. Mountain Dawn"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Category</label>
+              <select
+                className="border rounded w-full p-2 text-gray-900 bg-white"
+                value={category}
+                onChange={(e)=>setCategory(e.target.value)}
+                required
+              >
+                <option value="">Select a category</option>
+                {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Price (USD)</label>
+              <input
+                className="border rounded w-full p-2 text-gray-900"
+                type="number" min="0" step="0.01"
+                value={priceUSD}
+                onChange={(e)=>setPriceUSD(e.target.value)}
+                placeholder="e.g. 4.99"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Description</label>
+              <textarea
+                className="border rounded w-full p-2 text-gray-900"
+                rows={3}
+                value={description}
+                onChange={(e)=>setDescription(e.target.value)}
+                placeholder="Optional"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Image</label>
+              <div className="flex items-center gap-3">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e)=>setImageFile(e.target.files?.[0] || null)}
+                />
+                {/* Styled like Products button: dark + white text */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className={darkBtn}
+                >
+                  Choose Image…
+                </button>
+                <span className="text-sm text-gray-700">
+                  {imageFile ? imageFile.name : 'No file selected'}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-2 flex gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+              >
+                {loading ? 'Uploading…' : 'Create'}
+              </button>
+              {/* Styled like Products button: dark + white text */}
+              <button
+                type="button"
+                onClick={resetForm}
+                className={darkBtn}
+              >
+                Reset
+              </button>
+            </div>
+          </form>
+
+          {/* Product list with Delete */}
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left">
+                  <th className="px-3 py-2 font-medium text-gray-700">Image</th>
+                  <th className="px-3 py-2 font-medium text-gray-700">Title</th>
+                  <th className="px-3 py-2 font-medium text-gray-700">Category</th>
+                  <th className="px-3 py-2 font-medium text-gray-700">Price</th>
+                  <th className="px-3 py-2 font-medium text-gray-700">Created</th>
+                  <th className="px-3 py-2 font-medium text-gray-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map(p => (
+                  <tr key={p._id} className="border-t">
+                    <td className="px-3 py-2">
+                      {p.imageUrl ? (
+                        <img src={p.imageUrl} alt={p.title} className="h-10 w-14 object-cover rounded" />
+                      ) : '—'}
+                    </td>
+                    <td className="px-3 py-2 text-gray-900">{p.title}</td>
+                    <td className="px-3 py-2 text-gray-700">{p.category}</td>
+                    <td className="px-3 py-2 text-gray-900">
+                      {typeof p.price === 'number'
+                        ? (p.price / 100).toLocaleString(undefined, { style: 'currency', currency: 'USD' })
+                        : p.price}
+                    </td>
+                    <td className="px-3 py-2 text-gray-700">
+                      {p.createdAt ? new Date(p.createdAt).toLocaleString() : '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => deleteProduct(p._id)}
+                        className="px-3 py-1.5 rounded bg-red-600 text-white hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {products.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-3 py-6 text-center text-gray-500">
+                      No products found.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      {/* ORDERS */}
+      {!loading && !error && tab === 'orders' && (
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr className="text-left">
+                <th className="px-3 py-2 font-medium text-gray-700">Order #</th>
+                <th className="px-3 py-2 font-medium text-gray-700">Customer</th>
+                <th className="px-3 py-2 font-medium text-gray-700">Product</th>
+                <th className="px-3 py-2 font-medium text-gray-700">Price</th>
+                <th className="px-3 py-2 font-medium text-gray-700">Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orders.map(o => (
+                <tr key={o._id} className="border-t">
+                  <td className="px-3 py-2 text-gray-900">{o._id}</td>
+                  <td className="px-3 py-2 text-gray-700">{o.user?.email || '—'}</td>
+                  <td className="px-3 py-2 text-gray-900">
+                    {o.items?.length ? (
+                      <div className="flex items-center gap-2">
+                        {o.items[0].imageUrl ? (
+                          <img
+                            src={o.items[0].imageUrl}
+                            alt={o.items[0].title || o.items[0].product?.title}
+                            className="h-8 w-10 object-cover rounded"
+                          />
+                        ) : null}
+                        <div>
+                          <div className="font-medium">
+                            {o.items[0].title || o.items[0].product?.title}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {o.items[0].product?.category || '—'}
+                          </div>
+                        </div>
+                      </div>
+                    ) : '—'}
+                  </td>
+                  <td className="px-3 py-2 text-gray-900">
+                    {typeof o.total === 'number'
+                      ? (o.total / 100).toLocaleString(undefined, { style: 'currency', currency: 'USD' })
+                      : o.total}
+                  </td>
+                  <td className="px-3 py-2 text-gray-700">
+                    {o.createdAt ? new Date(o.createdAt).toLocaleString() : '—'}
+                  </td>
+                </tr>
+              ))}
+              {orders.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-3 py-6 text-center text-gray-500">
+                    No orders yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

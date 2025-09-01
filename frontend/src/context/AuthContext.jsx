@@ -1,3 +1,4 @@
+// frontend/src/context/AuthContext.jsx
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import api from "../lib/api.js";
 
@@ -11,10 +12,10 @@ export function AuthProvider({ children }) {
   });
   const [loading, setLoading] = useState(false);
 
-  // keep axios auth header in sync (if use bearer tokens)
+  // Keep axios Authorization header in sync
   useEffect(() => {
-    if (token) api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    else delete api.defaults.headers.common["Authorization"];
+    if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`;
+    else delete api.defaults.headers.common.Authorization;
   }, [token]);
 
   const saveAuth = (t, u) => {
@@ -27,8 +28,9 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     setLoading(true);
     try {
+      // ✅ Make sure your backend supports this path
       const { data } = await api.post("/api/auth/login", { email, password });
-      // expect shape: { token, user }
+      // expected shape: { token, user }
       saveAuth(data.token, data.user);
       return data.user;
     } finally {
@@ -36,13 +38,13 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const register = async (payload) => {
+  const register = async ({ name, email, password }) => {
     setLoading(true);
     try {
-      const { data } = await api.post("/api/auth/register", payload);
-      // auto-login after register
-      saveAuth(data.token, data.user);
-      return data.user;
+      const { data } = await api.post("/api/auth/register", { name, email, password });
+      // optional: auto-login after register if backend returns {token,user}
+      if (data?.token && data?.user) saveAuth(data.token, data.user);
+      return data.user ?? null;
     } finally {
       setLoading(false);
     }
@@ -56,23 +58,22 @@ export function AuthProvider({ children }) {
       localStorage.setItem("user", JSON.stringify(data));
       return data;
     } catch {
-      // token invalid/expired
+      // token bad/expired → clear
       saveAuth("", null);
       return null;
     }
   };
 
   const logout = async () => {
-    // Can call server logout endpoint here:
-    // await api.post("/api/auth/logout");
+    // (Optional) await api.post("/api/auth/logout");
     saveAuth("", null);
   };
 
-  useEffect(() => { fetchMe(); /* on mount/refresh */ }, []);
+  useEffect(() => { fetchMe(); }, []); // keep if your backend exposes /me
 
   const value = useMemo(() => ({
     token, user, loading,
-    login, logout, register, fetchMe
+    login, register, logout, fetchMe
   }), [token, user, loading]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -83,7 +84,3 @@ export const useAuth = () => {
   if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
   return ctx;
 };
-
-
-
-

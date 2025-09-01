@@ -70,7 +70,7 @@ router.post('/confirm', auth, async (req, res) => {
             product: p._id,
             title: p.title,
             imageUrl: p.imageUrl,
-            price: Number(p.price) || 0,
+            price: Number(p.price) || 0, // cents
           }];
           if (!total) total = Number(p.price) || 0;
         }
@@ -95,7 +95,7 @@ router.post('/confirm', auth, async (req, res) => {
     }
 
     const order = await Order.create({
-      user: currentUserIdStr,              // ensure string/ObjectId acceptable by your schema
+      user: currentUserIdStr, // mongoose will cast string → ObjectId
       items,
       total,
       status: 'paid',
@@ -111,11 +111,11 @@ router.post('/confirm', auth, async (req, res) => {
   }
 });
 
-
 /** GET /api/orders/my — current user’s orders */
 router.get('/my', auth, async (req, res) => {
   try {
     const orders = await Order.find({ user: req.user.id })
+      .populate('items.product', 'title price imageUrl category') // ✅ populate items.product
       .sort({ createdAt: -1 });
     return res.json(orders);
   } catch {
@@ -126,21 +126,20 @@ router.get('/my', auth, async (req, res) => {
 /**
  * GET /api/orders — admin: list orders
  */
-router.get('/', auth, requireAdmin, async (req, res) => {
+router.get('/', auth, requireAdmin, async (_req, res) => {
   try {
-    const status = (req.query.status || 'paid').toLowerCase();
-    const filter = status === 'all' ? {} : { status: 'paid' };
-
-    const orders = await Order.find(filter)
-      .sort({ createdAt: -1 })
-      .populate('user', 'email name role');
-
-    return res.json(orders);
-  } catch {
-    return res.status(500).json({ message: 'Failed to fetch orders' });
+    const orders = await Order.find()
+      .populate('user', 'email')
+      .populate('items.product', 'title price imageUrl category createdAt') // ✅ populate items.product
+      .sort({ createdAt: -1 });
+    res.json(orders);
+  } catch (err) {
+    console.error('orders error:', err);
+    res.status(500).json({ message: 'Failed to fetch orders' });
   }
 });
 
 export default router;
+
 
 
