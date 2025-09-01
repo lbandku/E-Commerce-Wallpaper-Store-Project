@@ -24,9 +24,17 @@ required([
 const app = express();
 
 // --- CORS ---
-const allowedOrigins = (process.env.FRONTEND_URL || '').split(',').map(o => o.trim());
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
 app.use(cors({
-  origin: allowedOrigins.length > 0 ? allowedOrigins : '*',
+  origin: (origin, callback) => {
+    // Allow non-browser requests (like health checks) with no Origin
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
   credentials: true,
 }));
 
@@ -62,4 +70,3 @@ mongoose.connect(process.env.MONGO_URI)
 
 
 
-  
