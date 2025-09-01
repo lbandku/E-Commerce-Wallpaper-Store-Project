@@ -1,3 +1,4 @@
+// backend/src/index.js
 import 'dotenv/config';
 import express from 'express';
 import mongoose from 'mongoose';
@@ -18,25 +19,38 @@ required([
   'CLOUDINARY_API_KEY',
   'CLOUDINARY_API_SECRET',
   'STRIPE_SECRET_KEY',
-  'FRONTEND_URL'
+  'FRONTEND_URL',
 ]);
 
 const app = express();
 
-// --- CORS ---
+// --- CORS (safe allowlist, no throws on preflight) ---
 const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map(s => s.trim())
   .filter(Boolean);
-app.use(cors({
+
+/**
+ * Use a non-throwing origin function:
+ * - Allows requests with no Origin (health checks, server-to-server)
+ * - Allows if Origin is in the allowlist
+ * - Otherwise returns false (no CORS headers), but does not 500
+ */
+const corsHandler = cors({
   origin: (origin, callback) => {
-    // Allow non-browser requests (like health checks) with no Origin
-    if (!origin) return callback(null, true);
+    if (!origin) return callback(null, true); // non-browser or same-origin
     if (allowedOrigins.includes(origin)) return callback(null, true);
-    return callback(new Error(`Not allowed by CORS: ${origin}`));
+    return callback(null, false); // not allowed, but don't error
   },
   credentials: true,
-}));
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+});
+
+// Must be before routes
+app.use(corsHandler);
+// Ensure OPTIONS preflights are handled
+app.options('*', corsHandler);
 
 // --- Middleware ---
 app.use(morgan('dev'));
@@ -56,10 +70,12 @@ app.use('/api/users', usersRoutes);
 // --- Start server ---
 const PORT = process.env.PORT || 5000;
 
-mongoose.connect(process.env.MONGO_URI)
+mongoose
+  .connect(process.env.MONGO_URI)
   .then(() => {
     app.listen(PORT, () => {
       console.log(`✅ API running on port ${PORT}`);
+      console.log('✅ CORS allowed origins:', allowedOrigins.join(', ') || '(none configured)');
     });
   })
   .catch(err => {
@@ -68,5 +84,4 @@ mongoose.connect(process.env.MONGO_URI)
   });
 
 
-
-
+  
