@@ -1,4 +1,15 @@
+
+
 @import "tailwindcss";
+
+/* one-time spin animation for the theme icon */
+@keyframes rotate-once {
+  to { transform: rotate(360deg); }
+}
+.spin-once {
+  animation: rotate-once 0.35s linear;
+}
+
 
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
@@ -75,5 +86,11 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+
+
+
+
+
 
 
