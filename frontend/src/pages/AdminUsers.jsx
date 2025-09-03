@@ -1,30 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
-/** Read your API base from env. This handles both:
- * - VITE_API_BASE_URL = https://api.onrender.com/api
- * - VITE_API_BASE_URL = https://api.onrender.com
- */
+/** Read API base from env; works whether it ends with /api or not */
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL || '';
-function normalizeBase(base) {
-  // remove trailing slashes
-  const trimmed = base.replace(/\/+$/, '');
-  return trimmed;
-}
-function apiJoin(base, path) {
-  const b = normalizeBase(base);
-  const p = path.replace(/^\/+/, '');
-  return `${b}/${p}`;
-}
-// If base ends with /api, we just append 'admin/users'.
-// If it doesn't, we append 'api/admin/users'.
+function normalizeBase(base) { return base.replace(/\/+$/, ''); }
+function join(base, path) { return `${normalizeBase(base)}/${path.replace(/^\/+/, '')}`; }
 const USERS_PATH = /\/api\/?$/.test(RAW_BASE) ? 'admin/users' : 'api/admin/users';
-const USERS_BASE_URL = apiJoin(RAW_BASE, USERS_PATH);
+const USERS_BASE_URL = join(RAW_BASE, USERS_PATH);
 
-/** Helper: get JWT from storage (adjust key name if different) */
+/** Get JWT (adjust keys if your app uses a different one) */
 function getToken() {
   return (
     localStorage.getItem('token') ||
     localStorage.getItem('authToken') ||
+    localStorage.getItem('accessToken') ||
+    localStorage.getItem('jwt') ||
+    localStorage.getItem('access_token') ||
     sessionStorage.getItem('token') ||
     ''
   );
@@ -40,38 +30,28 @@ export default function AdminUsers() {
     try {
       setLoading(true);
       setError('');
-      // Cache-bust and force no-store so we get a fresh JSON body
       const url = `${USERS_BASE_URL}?limit=1000&_ts=${Date.now()}`;
+      const token = getToken();
+      if (!token) {
+        setLoading(false);
+        setError('Please log in as an admin to view users.');
+        return;
+      }
       const res = await fetch(url, {
         method: 'GET',
-        credentials: 'include',
         cache: 'no-store',
         headers: {
-          Authorization: `Bearer ${getToken()}`,
+          Authorization: `Bearer ${token}`,
           'Cache-Control': 'no-cache',
           Accept: 'application/json'
         }
+        // credentials omitted (we use Bearer token header)
       });
 
-      // If the server ever sends 304, don't treat it as an error
-      if (res.status === 304) {
-        setLoading(false);
-        return;
-      }
-
-      if (!res.ok) {
-        // If HTML came back (e.g., wrong host), this will throw below
-        const text = await res.text();
-        try {
-          const maybeJson = JSON.parse(text);
-          throw new Error(maybeJson?.error || `Fetch failed: ${res.status}`);
-        } catch {
-          // Not JSON — likely HTML => show a helpful hint
-          throw new Error(
-            `Expected JSON but got HTML. Check VITE_API_BASE_URL on the frontend Render service points to your API. Response status: ${res.status}`
-          );
-        }
-      }
+      if (res.status === 304) { setLoading(false); return; }
+      if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
+      if (res.status === 403) throw new Error('Forbidden. Admin access required.');
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
 
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
@@ -90,26 +70,25 @@ export default function AdminUsers() {
     setBusy(prev => ({ ...prev, [u._id]: true }));
     setError('');
     try {
-      const res = await fetch(apiJoin(USERS_BASE_URL, `${u._id}/role`), {
+      const token = getToken();
+      if (!token) throw new Error('Unauthorized. Please log in again.');
+      const res = await fetch(join(USERS_BASE_URL, `${u._id}/role`), {
         method: 'PATCH',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`,
-          Accept: 'application/json'
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Cache-Control': 'no-cache'
         },
         body: JSON.stringify({ role: nextRole })
       });
-
+      if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
+      if (res.status === 403) throw new Error('Forbidden. Admin access required.');
       if (!res.ok) {
         let msg = `Update failed: ${res.status}`;
-        try {
-          const j = await res.json();
-          if (j?.error) msg = j.error;
-        } catch {/* ignore */}
+        try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
         throw new Error(msg);
       }
-
       await fetchUsers();
     } catch (e) {
       setError(e.message || 'Failed to update role.');
@@ -123,13 +102,10 @@ export default function AdminUsers() {
     return (
       <div style={{ padding: 16, color: 'crimson' }}>
         {error}
-        <button style={{ marginLeft: 12 }} onClick={fetchUsers}>
-          Retry
-        </button>
+        <button style={{ marginLeft: 12 }} onClick={fetchUsers}>Retry</button>
       </div>
     );
   }
-
   if (!users.length) return <div style={{ padding: 16 }}>No users found.</div>;
 
   return (
@@ -170,3 +146,4 @@ export default function AdminUsers() {
     </div>
   );
 }
+
