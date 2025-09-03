@@ -12,6 +12,7 @@ import ordersRoutes from './routes/orders.js';
 import usersRoutes from './routes/users.js';
 import adminUsersRoutes from './routes/adminUsers.js';
 
+
 // --- Validate required envs ---
 required([
   'MONGO_URI',
@@ -25,26 +26,33 @@ required([
 
 const app = express();
 
+// --- CORS (safe allowlist, no throws on preflight) ---
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
+  .split(',')
+  .map(s => s.trim())
+  .filter(Boolean);
+
 /**
- * HOTFIX: permissive CORS (reflects any origin) + no-store caching
- * This unblocks frontend requests while debug.
- * Later revert to the stricter CORS_ORIGIN allowlist.
+ * Use a non-throwing origin function:
+ * - Allows requests with no Origin (health checks, server-to-server)
+ * - Allows if Origin is in the allowlist
+ * - Otherwise returns false (no CORS headers), but does not 500
  */
-const corsHotfix = cors({
-  origin: (origin, cb) => cb(null, true), // reflect request origin
+const corsHandler = cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // non-browser or same-origin
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(null, false); // not allowed, but don't error
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 });
-app.use(corsHotfix);
-app.options('*', corsHotfix);
 
-// Disable caching / etag to avoid 304s
-app.set('etag', false);
-app.use((req, res, next) => {
-  res.set('Cache-Control', 'no-store');
-  next();
-});
+// Must be before routes
+app.use(corsHandler);
+// Ensure OPTIONS preflights are handled
+app.options('*', corsHandler);
 
 // --- Middleware ---
 app.use(morgan('dev'));
@@ -58,4 +66,27 @@ app.get('/', (_req, res) => res.json({ status: 'ok' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/checkout', checkoutRoutes);
-app.use('/api/orders',
+app.use('/api/orders', ordersRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/admin/users', adminUsersRoutes);
+
+
+
+// --- Start server ---
+const PORT = process.env.PORT || 5000;
+
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`✅ API running on port ${PORT}`);
+      console.log('✅ CORS allowed origins:', allowedOrigins.join(', ') || '(none configured)');
+    });
+  })
+  .catch(err => {
+    console.error('❌ Mongo connection error:', err);
+    process.exit(1);
+  });
+
+
+  
