@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
-/** Helper: get JWT from storage (adjust the keys if your app uses a different one) */
+/** Helper: get JWT from storage (adjust if key is named differently) */
 function getToken() {
   return (
     localStorage.getItem('token') ||
@@ -15,22 +15,34 @@ const API_BASE = '/api/admin/users';
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState({}); // map userId -> boolean
+  const [busy, setBusy] = useState({});
   const [error, setError] = useState('');
 
   const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
-      const res = await fetch(`${API_BASE}?limit=1000`, {
-        headers: { Authorization: `Bearer ${getToken()}` },
-        credentials: 'include'
+      // Add cache-buster to always get a fresh 200
+      const url = `${API_BASE}?limit=1000&_ts=${Date.now()}`;
+      const res = await fetch(url, {
+        method: 'GET',
+        credentials: 'include',
+        cache: 'no-store',
+        headers: {
+          Authorization: `Bearer ${getToken()}`,
+          'Cache-Control': 'no-cache'
+        }
       });
+      if (res.status === 304) {
+        // 304 = Not Modified → keep existing list
+        setLoading(false);
+        return;
+      }
       if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
     } catch (e) {
-      setError('Failed to load users.');
+      setError(e.message || 'Failed to load users.');
     } finally {
       setLoading(false);
     }
@@ -39,7 +51,8 @@ export default function AdminUsers() {
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   async function toggleRole(u) {
-    const nextRole = (u.role === 'admin' || u.isAdmin === true) ? 'user' : 'admin';
+    const isAdmin = u.role === 'admin' || u.isAdmin === true;
+    const nextRole = isAdmin ? 'user' : 'admin';
     setBusy(prev => ({ ...prev, [u._id]: true }));
     setError('');
     try {
@@ -56,7 +69,6 @@ export default function AdminUsers() {
         const msg = await res.json().catch(() => ({}));
         throw new Error(msg?.error || `Update failed: ${res.status}`);
       }
-      // Update list after success
       await fetchUsers();
     } catch (e) {
       setError(e.message || 'Failed to update role.');
@@ -66,12 +78,16 @@ export default function AdminUsers() {
   }
 
   if (loading) return <div style={{ padding: 16 }}>Loading users…</div>;
-  if (error) return (
-    <div style={{ padding: 16, color: 'crimson' }}>
-      {error}
-      <button style={{ marginLeft: 12 }} onClick={fetchUsers}>Retry</button>
-    </div>
-  );
+  if (error) {
+    return (
+      <div style={{ padding: 16, color: 'crimson' }}>
+        {error}
+        <button style={{ marginLeft: 12 }} onClick={fetchUsers}>
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   if (!users.length) return <div style={{ padding: 16 }}>No users found.</div>;
 
