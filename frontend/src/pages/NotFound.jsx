@@ -1,56 +1,51 @@
-import React, { useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import React, { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 
-export default function CheckoutCancel() {
-  const [params] = useSearchParams();
-  const reason = params.get('reason')?.trim();
-  const note = reason && reason.length ? `Reason: ${reason}` : 'You can try again anytime.';
+export default function NotFound() {
+  const loc = useLocation();
 
-  // Page title
   useEffect(() => {
     const prev = document.title;
-    document.title = 'Payment Canceled — ScreenTones';
+    document.title = "Page not found — ScreenTones";
     return () => { document.title = prev; };
   }, []);
 
   return (
     <main className="px-4 sm:px-6 lg:px-8 py-16">
-      {/* Force status color like on Success page */}
+      {/* Force readable status line like Success/Cancel */}
       <style>{`
-        #st-cancel-status { color: #000 !important; opacity: 1 !important; }
-        .dark #st-cancel-status { color: #D1D5DB !important; }
+        #st-404-note { color:#000 !important; opacity:1 !important; }
+        .dark #st-404-note { color:#D1D5DB !important; }
       `}</style>
 
       <div className="max-w-2xl mx-auto text-center">
-        {/* Cancel emblem */}
         <div
           className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full
-                     bg-[color-mix(in_srgb,#EF4444_12%,transparent)]
-                     border border-[color-mix(in_srgb,#EF4444_40%,black)]
+                     bg-[color-mix(in_srgb,var(--text,#111)_8%,transparent)]
+                     border border-[color-mix(in_srgb,var(--text,#111)_20%,transparent)]
                      shadow-sm"
           aria-hidden="true"
         >
-          <i className="bx bx-x text-3xl !text-[#EF4444]" />
+          <i className="bx bx-ghost text-3xl text-[var(--text)] opacity-80" />
         </div>
 
         <h1 className="mt-4 text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text)]">
-          Payment Canceled
+          Page not found
         </h1>
 
-        <div id="st-cancel-status" className="mt-2 text-[15px] sm:text-base">
-          Your checkout was canceled before completion. {note}
+        <div id="st-404-note" className="mt-2 text-[15px] sm:text-base">
+          We couldn’t find <span className="font-mono break-all">{loc.pathname}</span>.
         </div>
 
-        {/* Brand underline */}
         <div className="mx-auto mt-3 h-[3px] w-32 sm:w-36 rounded-full bg-[var(--brand,#2E6F6C)]/85" />
 
         <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
           <Link
-            to="/cart"
+            to="/gallery"
             className="px-4 py-2 rounded-lg font-semibold text-sm text-white
                        bg-[var(--brand,#2E6F6C)] hover:bg-[var(--brand-600,#2F6657)]"
           >
-            Return to Cart
+            Back to Gallery
           </Link>
           <Link
             to="/"
@@ -59,7 +54,7 @@ export default function CheckoutCancel() {
                        text-[var(--text)]
                        hover:bg-[color-mix(in_srgb,var(--text,#111)_14%,transparent)]"
           >
-            Back to Gallery
+            Go Home
           </Link>
         </div>
       </div>
