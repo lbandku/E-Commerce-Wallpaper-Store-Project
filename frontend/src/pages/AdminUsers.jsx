@@ -1,6 +1,26 @@
 import React, { useEffect, useState, useCallback } from 'react';
 
-/** Helper: get JWT from storage (adjust if key is named differently) */
+/** Read your API base from env. This handles both:
+ * - VITE_API_BASE_URL = https://api.onrender.com/api
+ * - VITE_API_BASE_URL = https://api.onrender.com
+ */
+const RAW_BASE = import.meta.env.VITE_API_BASE_URL || '';
+function normalizeBase(base) {
+  // remove trailing slashes
+  const trimmed = base.replace(/\/+$/, '');
+  return trimmed;
+}
+function apiJoin(base, path) {
+  const b = normalizeBase(base);
+  const p = path.replace(/^\/+/, '');
+  return `${b}/${p}`;
+}
+// If base ends with /api, we just append 'admin/users'.
+// If it doesn't, we append 'api/admin/users'.
+const USERS_PATH = /\/api\/?$/.test(RAW_BASE) ? 'admin/users' : 'api/admin/users';
+const USERS_BASE_URL = apiJoin(RAW_BASE, USERS_PATH);
+
+/** Helper: get JWT from storage (adjust key name if different) */
 function getToken() {
   return (
     localStorage.getItem('token') ||
@@ -9,8 +29,6 @@ function getToken() {
     ''
   );
 }
-
-const API_BASE = '/api/admin/users';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -22,23 +40,39 @@ export default function AdminUsers() {
     try {
       setLoading(true);
       setError('');
-      // Add cache-buster to always get a fresh 200
-      const url = `${API_BASE}?limit=1000&_ts=${Date.now()}`;
+      // Cache-bust and force no-store so we get a fresh JSON body
+      const url = `${USERS_BASE_URL}?limit=1000&_ts=${Date.now()}`;
       const res = await fetch(url, {
         method: 'GET',
         credentials: 'include',
         cache: 'no-store',
         headers: {
           Authorization: `Bearer ${getToken()}`,
-          'Cache-Control': 'no-cache'
+          'Cache-Control': 'no-cache',
+          Accept: 'application/json'
         }
       });
+
+      // If the server ever sends 304, don't treat it as an error
       if (res.status === 304) {
-        // 304 = Not Modified → keep existing list
         setLoading(false);
         return;
       }
-      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+
+      if (!res.ok) {
+        // If HTML came back (e.g., wrong host), this will throw below
+        const text = await res.text();
+        try {
+          const maybeJson = JSON.parse(text);
+          throw new Error(maybeJson?.error || `Fetch failed: ${res.status}`);
+        } catch {
+          // Not JSON — likely HTML => show a helpful hint
+          throw new Error(
+            `Expected JSON but got HTML. Check VITE_API_BASE_URL on the frontend Render service points to your API. Response status: ${res.status}`
+          );
+        }
+      }
+
       const data = await res.json();
       setUsers(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -56,19 +90,26 @@ export default function AdminUsers() {
     setBusy(prev => ({ ...prev, [u._id]: true }));
     setError('');
     try {
-      const res = await fetch(`${API_BASE}/${u._id}/role`, {
+      const res = await fetch(apiJoin(USERS_BASE_URL, `${u._id}/role`), {
         method: 'PATCH',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${getToken()}`
+          Authorization: `Bearer ${getToken()}`,
+          Accept: 'application/json'
         },
-        credentials: 'include',
         body: JSON.stringify({ role: nextRole })
       });
+
       if (!res.ok) {
-        const msg = await res.json().catch(() => ({}));
-        throw new Error(msg?.error || `Update failed: ${res.status}`);
+        let msg = `Update failed: ${res.status}`;
+        try {
+          const j = await res.json();
+          if (j?.error) msg = j.error;
+        } catch {/* ignore */}
+        throw new Error(msg);
       }
+
       await fetchUsers();
     } catch (e) {
       setError(e.message || 'Failed to update role.');
