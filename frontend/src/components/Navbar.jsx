@@ -4,7 +4,6 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { useCart } from '../context/CartContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 
-// Using word-mark assets (not hero lockups)
 import brandLight from '../assets/branding/screentones-nav-lockup-light.svg';
 import brandDark  from '../assets/branding/screentones-nav-lockup-dark.svg';
 
@@ -45,26 +44,32 @@ export default function Navbar() {
       "text-[var(--brand,#2E6F6C)] bg-[color-mix(in_srgb,var(--brand,#2E6F6C)_10%,var(--bg,#F8FAFC))] " +
       "hover:bg-[color-mix(in_srgb,var(--brand,#2E6F6C)_16%,var(--bg,#F8FAFC))]";
 
-const ThemeIcon = useMemo(() => {
-  const spin = spinning ? " spin-once" : "";
-  // Force yellow sun in dark mode via inline style (trumps other classes)
-  if (isDark) {
+  // Dedicated style for hamburger (readable in light mode)
+  const hamburgerBtn = isDark
+    ? "inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors " +
+      "text-white bg-[color-mix(in_srgb,var(--text,#F3F4F6)_22%,#0E1111)] " +
+      "hover:bg-[color-mix(in_srgb,var(--text,#F3F4F6)_32%,#0E1111)]"
+    : "inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors " +
+      "text-white bg-[var(--brand,#2E6F6C)] hover:bg-[var(--brand-600,#2F6657)]";
+
+  const ThemeIcon = useMemo(() => {
+    const spin = spinning ? " spin-once" : "";
+    if (isDark) {
+      return (
+        <i
+          className={`bx bx-sun text-xl${spin}`}
+          style={{ color: "#FBBF24" }}
+          aria-hidden="true"
+        />
+      );
+    }
     return (
       <i
-        className={`bx bx-sun text-xl${spin}`}
-        style={{ color: "#FBBF24" }}   // Tailwind's yellow-400 hex for sun
+        className={`bx bx-moon text-xl !text-[var(--brand,#2E6F6C)]${spin}`}
         aria-hidden="true"
       />
     );
-  }
-  // Moon stays primary brand color in light mode
-  return (
-    <i
-      className={`bx bx-moon text-xl !text-[var(--brand,#2E6F6C)]${spin}`}
-      aria-hidden="true"
-    />
-  );
-}, [isDark, spinning]);
+  }, [isDark, spinning]);
 
   const handleToggleTheme = () => {
     setSpinning(true);
@@ -82,7 +87,7 @@ const ThemeIcon = useMemo(() => {
           <div className="flex items-center">
             <button
               type="button"
-              className={`sm:hidden mr-2 ${iconBtnNeutral}`}
+              className={`sm:hidden mr-2 ${hamburgerBtn}`}
               aria-expanded={mobileOpen}
               aria-controls="mobile-nav"
               aria-label="Toggle navigation menu"
@@ -137,7 +142,6 @@ const ThemeIcon = useMemo(() => {
             <Link to="/admin-login" className={linkBase} onClick={closeMobile}>Admin</Link>
           )}
 
-          {/* My Orders (for users only, not admins) */}
           {token && user?.role !== "admin" && (
             <Link to="/orders/my" className={linkBase} onClick={closeMobile}>
               My Orders
