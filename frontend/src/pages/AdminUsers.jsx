@@ -1,149 +1,315 @@
-import React, { useEffect, useState, useCallback } from 'react';
+// frontend/src/pages/AdminUsers.jsx
+import React, { useEffect, useMemo, useState } from "react";
+import http from "../lib/api.js";
+import { useAuth } from "../context/AuthContext.jsx";
+import { toastError, toastSuccess } from "../lib/toast.js";
+import { BtnPrimary } from "../components/ui/Primitives.jsx";
 
-/** Read API base from env; works whether it ends with /api or not */
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL || '';
-function normalizeBase(base) { return base.replace(/\/+$/, ''); }
-function join(base, path) { return `${normalizeBase(base)}/${path.replace(/^\/+/, '')}`; }
-const USERS_PATH = /\/api\/?$/.test(RAW_BASE) ? 'admin/users' : 'api/admin/users';
-const USERS_BASE_URL = join(RAW_BASE, USERS_PATH);
+/** In dev, send AdminUsers traffic to  Render backend directly
+ *  In prod, use relative paths to match existing setup
+ */
+const DEV_USERS_BASE =
+  "https://e-commerce-wallpaper-store-project.onrender.com";
+const u = (path) => (import.meta.env.DEV ? `${DEV_USERS_BASE}${path}` : path);
 
-/** Get JWT (adjust keys if your app uses a different one) */
-function getToken() {
+/** Endpoints to probe on Render. */
+const USER_LIST_PATHS = [
+  "/api/admin/users",
+];
+
+/** Normalize shapes into consistent array. */
+function normalizeUsers(data) {
+  const arr = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.users)
+    ? data.users
+    : Array.isArray(data?.items)
+    ? data.items
+    : [];
+  return arr.map((u) => ({
+    id: u._id || u.id,
+    email: u.email || "",
+    name: u.name || "",
+    role: (u.role || (u.isAdmin ? "admin" : "user") || "user").toLowerCase(),
+    raw: u,
+  }));
+}
+
+/* UI bits: Role badge + segmented control */
+
+function RoleBadge({ role }) {
+  const isAdmin = role === "admin";
+  const cls = isAdmin
+    ? "bg-rose-500 text-white dark:bg-rose-400"
+    : "bg-emerald-500 text-white dark:bg-emerald-400";
   return (
-    localStorage.getItem('token') ||
-    localStorage.getItem('authToken') ||
-    localStorage.getItem('accessToken') ||
-    localStorage.getItem('jwt') ||
-    localStorage.getItem('access_token') ||
-    sessionStorage.getItem('token') ||
-    ''
+    <span
+      className={
+        "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold shadow-sm " +
+        cls
+      }
+    >
+      {isAdmin ? "ADMIN" : "USER"}
+    </span>
   );
 }
 
-export default function AdminUsers() {
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState({});
-  const [error, setError] = useState('');
+function RoleToggle({ user, adminCount, busy, onChange }) {
+  const isAdmin = user.role === "admin";
+  const isLastAdmin = isAdmin && adminCount <= 1;
 
-  const fetchUsers = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const url = `${USERS_BASE_URL}?limit=1000&_ts=${Date.now()}`;
-      const token = getToken();
-      if (!token) {
-        setLoading(false);
-        setError('Please log in as an admin to view users.');
-        return;
-      }
-      const res = await fetch(url, {
-        method: 'GET',
-        cache: 'no-store',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Cache-Control': 'no-cache',
-          Accept: 'application/json'
-        }
-        // credentials omitted (we use Bearer token header)
-      });
+  const base =
+    "px-2.5 py-1 text-xs font-semibold transition outline-none " +
+    "focus-visible:ring-2 ring-offset-1 ring-offset-[var(--bg,#F8FAFC)] " +
+    "focus-visible:ring-[var(--brand,#2E6F6C)] disabled:opacity-50 disabled:cursor-not-allowed";
 
-      if (res.status === 304) { setLoading(false); return; }
-      if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
-      if (res.status === 403) throw new Error('Forbidden. Admin access required.');
-      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+  const userBtn =
+    (user.role === "user"
+      ? "bg-emerald-600 text-white hover:bg-emerald-600"
+      : "bg-[var(--surface,#fff)] text-[var(--text)] hover:bg-[color-mix(in_srgb,var(--brand,#2E6F6C)_10%,transparent)]") +
+    " " +
+    base;
 
-      const data = await res.json();
-      setUsers(Array.isArray(data) ? data : []);
-    } catch (e) {
-      setError(e.message || 'Failed to load users.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { fetchUsers(); }, [fetchUsers]);
-
-  async function toggleRole(u) {
-    const isAdmin = u.role === 'admin' || u.isAdmin === true;
-    const nextRole = isAdmin ? 'user' : 'admin';
-    setBusy(prev => ({ ...prev, [u._id]: true }));
-    setError('');
-    try {
-      const token = getToken();
-      if (!token) throw new Error('Unauthorized. Please log in again.');
-      const res = await fetch(join(USERS_BASE_URL, `${u._id}/role`), {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        body: JSON.stringify({ role: nextRole })
-      });
-      if (res.status === 401) throw new Error('Unauthorized. Please log in again.');
-      if (res.status === 403) throw new Error('Forbidden. Admin access required.');
-      if (!res.ok) {
-        let msg = `Update failed: ${res.status}`;
-        try { const j = await res.json(); if (j?.error) msg = j.error; } catch {}
-        throw new Error(msg);
-      }
-      await fetchUsers();
-    } catch (e) {
-      setError(e.message || 'Failed to update role.');
-    } finally {
-      setBusy(prev => ({ ...prev, [u._id]: false }));
-    }
-  }
-
-  if (loading) return <div style={{ padding: 16 }}>Loading users…</div>;
-  if (error) {
-    return (
-      <div style={{ padding: 16, color: 'crimson' }}>
-        {error}
-        <button style={{ marginLeft: 12 }} onClick={fetchUsers}>Retry</button>
-      </div>
-    );
-  }
-  if (!users.length) return <div style={{ padding: 16 }}>No users found.</div>;
+  const adminBtn =
+    (user.role === "admin"
+      ? "bg-rose-600 text-white hover:bg-rose-600"
+      : "bg-[var(--surface,#fff)] text-[var(--text)] hover:bg-[color-mix(in_srgb,var(--brand,#2E6F6C)_10%,transparent)]") +
+    " " +
+    base;
 
   return (
-    <div style={{ padding: 16 }}>
-      <h1 style={{ marginBottom: 12 }}>Users</h1>
-      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-        <thead>
-          <tr style={{ textAlign: 'left', borderBottom: '1px solid #ddd' }}>
-            <th style={{ padding: '8px 6px' }}>Name</th>
-            <th style={{ padding: '8px 6px' }}>Email</th>
-            <th style={{ padding: '8px 6px' }}>Role</th>
-            <th style={{ padding: '8px 6px' }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map(u => {
-            const isAdmin = u.role === 'admin' || u.isAdmin === true;
-            return (
-              <tr key={u._id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{ padding: '8px 6px' }}>{u.name || '—'}</td>
-                <td style={{ padding: '8px 6px' }}>{u.email}</td>
-                <td style={{ padding: '8px 6px' }}>{isAdmin ? 'admin' : 'user'}</td>
-                <td style={{ padding: '8px 6px' }}>
-                  <button
-                    onClick={() => toggleRole(u)}
-                    disabled={!!busy[u._id]}
-                    aria-busy={!!busy[u._id]}
-                    style={{ padding: '6px 10px', borderRadius: 6 }}
-                  >
-                    {busy[u._id] ? 'Saving…' : (isAdmin ? 'Make user' : 'Make admin')}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+    <div className="inline-flex rounded-lg overflow-hidden border border-[var(--border,#E5E7EB)] dark:bg-white/5">
+      <button
+        type="button"
+        className={userBtn}
+        disabled={busy || (user.role === "admin" && isLastAdmin)} // prevent demoting the last admin
+        aria-pressed={user.role === "user"}
+        onClick={() => onChange("user")}
+      >
+        User
+      </button>
+      <button
+        type="button"
+        className={adminBtn}
+        disabled={busy}
+        aria-pressed={user.role === "admin"}
+        onClick={() => onChange("admin")}
+      >
+        Admin
+      </button>
     </div>
   );
 }
 
+/* Page */
+
+export default function AdminUsers() {
+  const { user: me } = useAuth();
+
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState("");
+  const [busyId, setBusyId] = useState("");
+  const [basePath, setBasePath] = useState(""); 
+
+  const adminCount = useMemo(
+    () => users.filter((u) => u.role === "admin").length,
+    [users]
+  );
+
+  /** Probe list endpoints (dev→Render only). In prod assume existing relative path works. */
+  const resolveUsersListPath = async () => {
+    if (basePath) return basePath;
+    if (!import.meta.env.DEV) {
+      setBasePath("/api/admin/users");
+      return "/api/admin/users";
+    }
+    for (const path of USER_LIST_PATHS) {
+      try {
+        const { data } = await http.get(u(path), { params: { limit: 1 } });
+        const arr = normalizeUsers(data);
+        if (Array.isArray(arr)) {
+          setBasePath(path);
+          return path;
+        }
+      } catch {
+        // try next
+      }
+    }
+    throw new Error(
+      `No users endpoint responded on Render. Tried: ${USER_LIST_PATHS.join(", ")}`
+    );
+  };
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      const path = await resolveUsersListPath();
+      const { data } = await http.get(u(path), { params: { limit: 1000 } });
+      setUsers(normalizeUsers(data));
+    } catch (e) {
+      const msg =
+        e?.response?.data?.message || e?.message || "Failed to load users";
+      setErr(msg);
+      toastError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  async function setRole(user, nextRole) {
+    if (user.role === nextRole) return;
+
+    if (user.role === "admin" && nextRole !== "admin" && adminCount <= 1) {
+      toastError("You can’t demote the last admin.");
+      return;
+    }
+
+    const prevRole = user.role;
+    setBusyId(user.id);
+    // optimistic
+    setUsers((xs) =>
+      xs.map((x) => (x.id === user.id ? { ...x, role: nextRole } : x))
+    );
+
+    try {
+      const listPath = basePath || (await resolveUsersListPath());
+      try {
+        await http.patch(u(`${listPath}/${user.id}/role`), { role: nextRole });
+      } catch {
+        await http.patch(u(`${listPath}/${user.id}`), { role: nextRole });
+      }
+      toastSuccess(
+        `Set ${user.name || user.email || "user"} to ${nextRole.toUpperCase()}`
+      );
+    } catch (e) {
+      // rollback
+      setUsers((xs) =>
+        xs.map((x) => (x.id === user.id ? { ...x, role: prevRole } : x))
+      );
+      toastError(
+        e?.response?.data?.message || e.message || "Could not change role"
+      );
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  async function deleteUser(user) {
+    const myId = me?._id || me?.id || "";
+    if (user.id && myId && user.id === myId) {
+      toastError("You can’t delete your own account.");
+      return;
+    }
+    if (user.role === "admin" && adminCount <= 1) {
+      toastError("You can’t delete the last admin.");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Delete ${user.name || user.email || "this user"}? This cannot be undone.`
+    );
+    if (!ok) return;
+
+    setBusyId(user.id);
+    const prev = users;
+    setUsers((xs) => xs.filter((x) => x.id !== user.id));
+
+    try {
+      const listPath = basePath || (await resolveUsersListPath());
+      try {
+        await http.delete(u(`${listPath}/${user.id}`));
+      } catch {
+        await http.delete(u(`${listPath}/delete/${user.id}`));
+      }
+      toastSuccess("User deleted");
+    } catch (e) {
+      setUsers(prev);
+      toastError(
+        e?.response?.data?.message || e.message || "Could not delete user"
+      );
+    } finally {
+      setBusyId("");
+    }
+  }
+
+  return (
+    <main className="px-4">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-[var(--text)]">Users</h1>
+        <BtnPrimary onClick={fetchUsers} disabled={loading}>
+          {loading ? "Refreshing…" : "Refresh"}
+        </BtnPrimary>
+      </div>
+
+      {err && (
+        <div className="mb-4 rounded-lg border border-red-300/60 bg-red-50/70 text-red-700 px-3 py-2 text-sm">
+          {err}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="text-[var(--muted)]">Loading users…</div>
+      ) : users.length === 0 ? (
+        <div className="text-[var(--muted)]">No users found.</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border border-[var(--border,#E5E7EB)] rounded-lg">
+            <thead className="bg-[var(--surface,#f9fafb)] dark:bg-white/10">
+              <tr>
+                <th className="px-4 py-2 text-left text-sm font-medium text-[var(--muted)]">
+                  Name
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-medium text-[var(--muted)]">
+                  Email
+                </th>
+                <th className="px-4 py-2 text-left text-sm font-medium text-[var(--muted)]">
+                  Role
+                </th>
+                <th className="px-4 py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((u) => (
+                <tr
+                  key={u.id}
+                  className="border-t border-[var(--border,#E5E7EB)]"
+                >
+                  <td className="px-4 py-2 text-[var(--text)]">
+                    {u.name || "—"}
+                  </td>
+                  <td className="px-4 py-2 text-[var(--text)]">{u.email}</td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <RoleBadge role={u.role} />
+                      <RoleToggle
+                        user={u}
+                        adminCount={adminCount}
+                        busy={busyId === u.id}
+                        onChange={(role) => setRole(u, role)}
+                      />
+                    </div>
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      onClick={() => deleteUser(u)}
+                      disabled={busyId === u.id}
+                      className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-50"
+                    >
+                      Delete Account
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </main>
+  );
+}
