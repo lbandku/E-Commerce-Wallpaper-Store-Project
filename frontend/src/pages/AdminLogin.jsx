@@ -1,84 +1,139 @@
 // frontend/src/pages/AdminLogin.jsx
-import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext.jsx';
-import { useNavigate, Link } from 'react-router-dom';
-import { toastError, toastSuccess } from '../lib/toast.js';
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useNavigate, Link } from "react-router-dom";
+import { toastError, toastSuccess } from "../lib/toast.js";
 
 export default function AdminLogin() {
   const nav = useNavigate();
   const { login, logout } = useAuth();
-  const [email, setEmail] = useState('admin@example.com');
-  const [password, setPassword] = useState('admin123');
-  const [error, setError] = useState('');
+
+  // ⬇️ Start empty (no dev autofill)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const prev = document.title;
+    document.title = "Admin Login — ScreenTones";
+    return () => { document.title = prev; };
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setBusy(true);
     try {
-      // Single source of truth: use AuthContext.login (hits /api/auth/login internally)
       const user = await login(email, password);
 
-      if (user?.role !== 'admin') {
-        // Not an admin — immediately clear any auth and show message
-        await logout();
-        setError('This account is not an admin.');
-        toastError('This account is not an admin.');
+      if (user?.role !== "admin") {
+        await logout?.();
+        const msg = "This account is not an admin.";
+        setError(msg);
+        toastError(msg);
         return;
       }
 
-      toastSuccess('Admin login successful');
-      nav('/admin');
+      // ⬇️ Clear form before navigating away
+      setEmail("");
+      setPassword("");
+
+      toastSuccess("Admin login successful");
+      nav("/admin");
     } catch {
-      setError('Login failed');
-      toastError('Login failed');
+      setError("Login failed");
+      toastError("Login failed");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="max-w-sm mx-auto bg-white p-6 rounded-xl shadow">
-      <h2 className="text-xl font-semibold mb-4 text-gray-900">Admin Login</h2>
-      {error && <p className="text-red-600 text-sm mb-2">{error}</p>}
+    <main className="px-0">
+      {/* Header */}
+      <div className="text-center mb-6">
+        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--text)]">
+          Admin Login
+        </h1>
+        <div className="mx-auto mt-2 h-[3px] w-24 sm:w-28 rounded-full bg-[var(--brand,#2E6F6C)]/85" />
+      </div>
 
-      <form onSubmit={submit}>
-        <input
-          className="border rounded w-full p-2 mb-3 text-gray-900 placeholder-gray-500"
-          placeholder="Admin email"
-          type="email"
-          autoComplete="username"
-          value={email}
-          onChange={(e)=>setEmail(e.target.value)}
-          required
-        />
-        <input
-          className="border rounded w-full p-2 mb-4 text-gray-900 placeholder-gray-500"
-          placeholder="Password"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          onChange={(e)=>setPassword(e.target.value)}
-          required
-        />
-        <button
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 disabled:opacity-60"
-          disabled={busy}
-        >
-          {busy ? 'Signing in…' : 'Login'}
-        </button>
-      </form>
+      {/* Card */}
+      <div className="max-w-sm mx-auto rounded-2xl border border-[var(--border,#E5E7EB)]/60 bg-[var(--surface,#fff)]/60 dark:bg-white/5 p-6">
+        {/* Admin-only hint */}
+        <div className="mb-4 flex items-center gap-2 rounded-xl px-3 py-2
+                        bg-[color-mix(in_srgb,var(--brand,#2E6F6C)_12%,transparent)]
+                        text-[var(--brand-700,#24534f)]">
+          <i className="bx bx-shield-quarter text-xl" aria-hidden="true" />
+          <span className="text-sm font-medium">For administrators only</span>
+        </div>
 
-      <p className="text-center text-sm text-gray-600 mt-3">
-        Not an admin? <Link to="/login" className="underline">User login</Link>
-      </p>
-    </div>
+        {error && (
+          <div className="mb-3 rounded-lg border border-red-300/60 bg-red-50/70 text-red-700 px-3 py-2 text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={submit} className="space-y-3" autoComplete="off">
+          <div>
+            <label className="block text-sm font-medium text-[var(--text)]">
+              Admin email
+            </label>
+            <input
+              type="email"
+              inputMode="email"
+              autoCapitalize="none"
+              spellCheck={false}
+              autoComplete="username"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="admin@example.com"
+              className="mt-1 w-full rounded-xl border border-[var(--border,#E5E7EB)] bg-[var(--surface,#fff)]
+                         px-3 py-2 text-[var(--text)] placeholder-[var(--muted)]
+                         focus:outline-none focus:ring-2 ring-offset-1 ring-offset-[var(--bg,#F8FAFC)]
+                         focus:ring-[var(--brand,#2E6F6C)]"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[var(--text)]">
+              Password
+            </label>
+            <input
+              type="password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              className="mt-1 w-full rounded-xl border border-[var(--border,#E5E7EB)] bg-[var(--surface,#fff)]
+                         px-3 py-2 text-[var(--text)] placeholder-[var(--muted)]
+                         focus:outline-none focus:ring-2 ring-offset-1 ring-offset-[var(--bg,#F8FAFC)]
+                         focus:ring-[var(--brand,#2E6F6C)]"
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full mt-2 px-4 py-2 rounded-xl font-semibold text-white
+                       bg-[var(--brand,#2E6F6C)] hover:bg-[var(--brand-600,#2F6657)]
+                       disabled:opacity-60"
+          >
+            {busy ? "Signing in…" : "Login"}
+          </button>
+        </form>
+
+        <p className="text-center text-sm text-[var(--muted)] mt-4">
+          Not an admin?{" "}
+          <Link to="/login" className="underline hover:opacity-80">
+            User login
+          </Link>
+        </p>
+      </div>
+    </main>
   );
 }
-
-
-
-
-
-

@@ -1,0 +1,64 @@
+/* Base (fallbacks) */
+:root {
+  /* Neutrals */
+  --bg: #F8FAFC;       /* light background */
+  --surface: #FFFFFF;
+  --text: #1A1A1A;
+  --muted: #6B7280;
+  --border: #E5E7EB;
+
+  /* Brand & accents */
+  --brand: #2E6F6C;    /* primary */
+  --brand-600: #2F6657;
+  --accent: #8B6F91;
+  --highlight: #E07B5F;
+
+  /* States */
+  --success: #16A34A;
+  --danger: #DC2626;
+
+  /* Shape */
+  --radius-lg: 20px;
+}
+
+/* Dark mode variables (toggle <html class="dark">) */
+.dark {
+  --bg: #0E1111;
+  --surface: #1B1F23;
+  --text: #F3F4F6;
+  --muted: #9CA3AF;
+  --border: #2D333B;
+
+  --brand: #4AB1A2;     /* dark primary */
+  --brand-600: #38998d;
+  --accent: #C3A1C9;
+  --highlight: #F0A394;
+
+  --success: #4ADE80;
+  --danger: #F87171;
+}
+
+/* Ready-made palettes can use with data-theme */
+:root[data-theme="cool-light"] {
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --text: #1A1A1A;
+  --muted: #6B7280;
+  --border: #E5E7EB;
+  --brand: #2E6F6C;
+  --brand-600: #2F6657;
+  --accent: #8B6F91;
+  --highlight: #E07B5F;
+}
+:root[data-theme="warm-light"] {
+  --bg: #F9FAFB;
+  --surface: #FFFFFF;
+  --text: #1A1A1A;
+  --muted: #6B7280;
+  --border: #E5E7EB;
+  --brand: #3A7D6B;
+  --brand-600: #2F6657;
+  --accent: #8C7384;
+  --highlight: #C97F6D;
+}
+

@@ -1,0 +1,30 @@
+/* Brand focus rings for core controls */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  /* 2-layer ring: offset (bg) + brand */
+  box-shadow:
+    0 0 0 2px var(--bg, #F8FAFC),
+    0 0 0 4px var(--brand, #2E6F6C) !important;
+  border-radius: 12px; /* soft corners to match UI */
+}
+
+.dark a:focus-visible,
+.dark button:focus-visible,
+.dark input:focus-visible,
+.dark select:focus-visible,
+.dark textarea:focus-visible {
+  box-shadow:
+    0 0 0 2px var(--bg, #0F1212),
+    0 0 0 4px var(--brand, #2E6F6C) !important;
+}
+
+/* Improve text selection contrast */
+::selection {
+  background: color-mix(in srgb, var(--brand, #2E6F6C) 24%, transparent);
+  color: #fff;
+}
+

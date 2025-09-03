@@ -2,7 +2,7 @@
 
 @import "tailwindcss";
 
-/* one-time spin animation for the theme icon */
+/* One-time 360 degree spin animation for the sun/mooon toggle icon */
 @keyframes rotate-once {
   to { transform: rotate(360deg); }
 }
@@ -39,7 +39,7 @@ html, body, #root {
   height: 100%;
   min-height: 100%;
   width: 100%;
-  background: #ffffff; /* prevents dark section on the right */
+  background: #ffffff; /* Prevents dark section/band on right */
 }
 
 body {
@@ -89,6 +89,12 @@ button:focus-visible {
 
 
 
+/* Ensures anchors don’t fight token colors */
+a, a:visited { color: inherit; text-decoration: none; }
+
+/* One-time spin helper */
+@keyframes spin-once { to { transform: rotate(360deg); } }
+.spin-once { animation: spin-once 360ms ease; }
 
 
 

@@ -1,11 +1,12 @@
-// frontend/src/pages/Gallery.jsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { api } from '../lib/api.js';
 import ProductCard from '../components/ProductCard.jsx';
 import { useSearchParams } from 'react-router-dom';
 import { toastError } from '../lib/toast.js';
+import { Input, Select, BtnSecondary } from "../components/ui/Primitives.jsx";
 
-const CATEGORIES = ['Nature', 'Abstract', 'Minimal', 'Technology', 'Animals', 'Holiday'];
+const CATEGORIES = ['Nature', 'Abstract', 'Technology', 'Animals', 'Holiday'];
+const PAGE_SIZE = 12;
 
 export default function Gallery() {
   const [items, setItems] = useState([]);
@@ -23,7 +24,6 @@ export default function Gallery() {
   const setParam = (key, val) => {
     const p = new URLSearchParams(params);
     if (!val) p.delete(key); else p.set(key, val);
-    // reset page on filter/sort/search change
     if (['category', 'q', 'sort'].includes(key)) p.delete('page');
     setParams(p, { replace: true });
   };
@@ -34,7 +34,7 @@ export default function Gallery() {
     if (category) p.set('category', category);
     if (sort) p.set('sort', sort);
     if (page > 1) p.set('page', String(page));
-    p.set('limit', '12');
+    p.set('limit', String(PAGE_SIZE));
     return `?${p.toString()}`;
   }, [q, category, sort, page]);
 
@@ -42,19 +42,27 @@ export default function Gallery() {
     let ok = true;
     setLoading(true);
     setErr('');
+
     api.get(`/api/products/search${queryString}`)
       .then(({ data }) => {
         if (!ok) return;
         setItems(data.items || []);
         setTotal(data.total || 0);
         setPages(data.pages || 1);
+        if ((data.pages || 1) < page) {
+          const p = new URLSearchParams(params);
+          p.set('page', '1');
+          setParams(p, { replace: true });
+        }
       })
       .catch(e => {
         if (!ok) return;
-        setErr(e?.response?.data?.message || 'Failed to load products');
+        const msg = e?.response?.data?.message || 'Failed to load products';
+        setErr(msg);
         toastError('Failed to load products');
       })
       .finally(() => ok && setLoading(false));
+
     return () => { ok = false; };
   }, [queryString]);
 
@@ -71,104 +79,130 @@ export default function Gallery() {
   const nextPage = () => setParam('page', String(Math.min(page + 1, pages)));
   const prevPage = () => setParam('page', String(Math.max(page - 1, 1)));
 
+  const pagerBtn =
+    "group inline-flex items-center gap-2 px-3 py-2 rounded-[var(--radius-lg,20px)] text-sm font-semibold " +
+    "border border-[var(--border,#E5E7EB)] bg-[var(--surface,#fff)] " +
+    "text-[var(--brand,#2E6F6C)] hover:text-[var(--brand-600,#2F6657)] " +
+    "hover:bg-[color-mix(in_srgb,var(--brand,#2E6F6C)_10%,var(--surface,#fff))] " +
+    "transition shadow-sm hover:shadow ring-offset-2 ring-offset-[var(--bg,#F8FAFC)] " +
+    "focus-visible:ring-2 focus-visible:ring-[var(--brand,#2E6F6C)] hover:ring-2 hover:ring-[var(--brand,#2E6F6C)] " +
+    "disabled:opacity-50 disabled:cursor-not-allowed";
+
+  const start = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const end = Math.min(page * PAGE_SIZE, total);
+
   return (
-    <>
-      <div className="text-center mb-6">
-        <h1 className="text-3xl text-gray-600 font-bold">ScreenTones</h1>
-        <p className="text-gray-600 mt-1">Capture Your Tone.</p>
+    <main className="px-4 sm:px-6 lg:px-8 pb-16">
+      {/* Header with subtitle + green underline */}
+      <div className="text-center mb-5 sm:mb-6">
+        <style>{`
+          .gallery-subtitle { color: #374151 !important; }         /* light */
+          .dark .gallery-subtitle { color: #d1d5db !important; }   /* dark */
+        `}</style>
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-[var(--text)]">
+          Wallpaper Gallery
+        </h1>
+        <p className="gallery-subtitle mt-2 max-w-2xl mx-auto">
+          Curated digital wallpapers—download in crisp, device-ready sizes.
+        </p>
+        <div
+          aria-hidden="true"
+          className="mx-auto mt-2 h-[3px] w-32 sm:w-36 lg:w-40 rounded-full bg-[var(--brand,#2E6F6C)]/85"
+        />
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6 items-end">
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-800">Category:</label>
-          <select
-            className="border rounded px-3 py-2 bg-white text-gray-800"
-            value={category}
-            onChange={(e)=> setParam('category', e.target.value)}
-          >
+          <label className="text-xs sm:text-sm text-[var(--muted)]">Category:</label>
+          <Select value={category} onChange={(e)=> setParam('category', e.target.value)} className="w-full">
             <option value="">All</option>
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          </Select>
           {category && (
-            <button
-              className="px-3 py-2 rounded-lg text-sm font-medium border border-gray-400 text-gray-900 bg-white hover:bg-gray-200 transition"
-              onClick={()=> setParam('category','')}
-            >
-              Clear
-            </button>
+            <BtnSecondary onClick={()=> setParam('category','')} className="h-[42px] shrink-0">Clear</BtnSecondary>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-800">Search:</label>
-          <input
+          <label className="text-xs sm:text-sm text-[var(--muted)]">Search:</label>
+          <Input
+            icon="bx-search"
             value={q}
             onChange={(e)=> setParam('q', e.target.value)}
-            className="border rounded px-3 py-2 bg-white text-gray-800"
             placeholder="Search wallpapers"
+            className="w-full"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-800">Sort:</label>
-          <select
-            className="border rounded px-3 py-2 bg-white text-gray-800"
-            value={sort}
-            onChange={(e)=> setParam('sort', e.target.value)}
-          >
+          <label className="text-xs sm:text-sm text-[var(--muted)]">Sort:</label>
+          <Select value={sort} onChange={(e)=> setParam('sort', e.target.value)} className="w-full">
             <option value="newest">Newest</option>
             <option value="priceAsc">Price: Low → High</option>
             <option value="priceDesc">Price: High → Low</option>
-          </select>
+          </Select>
         </div>
+      </section>
+
+      {/* Status / Count */}
+      <div className="mt-1 text-sm text-[var(--muted)]" aria-live="polite">
+        {loading ? "Loading wallpapers…" : err ? "" : `Showing ${start}–${end} of ${total}`}
       </div>
 
       {/* Results */}
-      {loading && <div className="py-16 text-center text-gray-500">Loading wallpapers…</div>}
-      {!loading && err && <div className="py-10 text-center text-red-600">{err}</div>}
-      {!loading && !err && items.length === 0 && (
-        <div className="py-16 text-center text-gray-500">
-          No wallpapers{category ? ` in “${category}”` : ''}{q ? ` matching “${q}”` : ''}.
-        </div>
-      )}
-
-      {!loading && !err && items.length > 0 && (
-        <>
-          <div className="mb-3 text-sm text-gray-600">
-            Showing {(page - 1) * 12 + 1}–{Math.min(page * 12, total)} of {total}
+      <section className="mt-4">
+        {err && !loading && (
+          <div className="rounded-xl border border-[color-mix(in_srgb,var(--danger,#ef4444)_35%,transparent)] bg-[color-mix(in_srgb,var(--danger,#ef4444)_12%,transparent)] text-[var(--danger,#ef4444)] p-4 text-center">
+            {err}
           </div>
+        )}
 
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-            {items.map(it => <ProductCard key={it._id} item={it} onBuy={buy} />)}
+        {loading && (
+          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-2xl border border-[var(--border,#E5E7EB)]/20 bg-white/5 h-80 animate-pulse" />
+            ))}
           </div>
+        )}
 
-          {/* Pager */}
-          {pages > 1 && (
-            <div className="mt-6 flex items-center justify-center gap-3">
-              <button
-                onClick={prevPage}
-                disabled={page <= 1}
-                className="px-3 py-2 rounded-lg text-sm font-medium border border-gray-400 text-gray-900 bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                Prev
-              </button>
-              <span className="text-gray-700 text-sm">Page {page} of {pages}</span>
-              <button
-                onClick={nextPage}
-                disabled={page >= pages}
-                className="px-3 py-2 rounded-lg text-sm font-medium border border-gray-400 text-gray-900 bg-white hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                Next
-              </button>
+        {!loading && !err && items.length === 0 && (
+          <div className="rounded-xl border border-[var(--border,#E5E7EB)]/20 bg-white/5 text-[var(--muted)] p-8 text-center">
+            No wallpapers{category ? ` in “${category}”` : ''}{q ? ` matching “${q}”` : ''}.
+          </div>
+        )}
+
+        {!loading && !err && items.length > 0 && (
+          <>
+            <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+              {items.map((it, idx) => (
+                <ProductCard
+                  key={it._id}
+                  item={it}
+                  onBuy={buy}
+                  priority={idx < 3} 
+                />
+              ))}
             </div>
-          )}
-        </>
-      )}
-    </>
+
+            {pages > 1 && (
+              <div className="mt-6 flex items-center justify-center gap-3">
+                <button onClick={prevPage} disabled={page <= 1} className={pagerBtn} aria-label="Previous page">
+                  <i className="bx bx-chevron-left text-lg transform transition-transform group-hover:-translate-x-0.5" />
+                  Prev
+                </button>
+
+                <span className="text-[var(--muted)] text-sm">Page {page} of {pages}</span>
+
+                <button onClick={nextPage} disabled={page >= pages} className={pagerBtn} aria-label="Next page">
+                  Next
+                  <i className="bx bx-chevron-right text-lg transform transition-transform group-hover:translate-x-0.5" />
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </section>
+    </main>
   );
 }
-
-
-
-
