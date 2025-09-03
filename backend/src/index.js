@@ -10,6 +10,8 @@ import productRoutes from './routes/products.js';
 import checkoutRoutes from './routes/checkout.js';
 import ordersRoutes from './routes/orders.js';
 import usersRoutes from './routes/users.js';
+import adminUsersRoutes from './routes/adminUsers.js';
+
 
 // --- Validate required envs ---
 required([
@@ -66,6 +68,9 @@ app.use('/api/products', productRoutes);
 app.use('/api/checkout', checkoutRoutes);
 app.use('/api/orders', ordersRoutes);
 app.use('/api/users', usersRoutes);
+app.use('/api/admin/users', adminUsersRoutes);
+
+
 
 // --- Start server ---
 const PORT = process.env.PORT || 5000;
