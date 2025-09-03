@@ -1,3 +1,4 @@
+// frontend/src/pages/AdminDashboard.jsx
 import React from "react";
 import { Link } from "react-router-dom";
 
@@ -20,21 +21,20 @@ export default function AdminDashboard() {
           <p className="text-sm text-[var(--muted)] mt-1">
             Add new wallpapers and manage inventory (search & delete).
           </p>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-wrap gap-2">
             <Link
               to="/admin/products"
               className="px-3 py-2 rounded-xl font-semibold text-white
                          bg-[var(--brand,#2E6F6C)] hover:bg-[var(--brand-600,#2F6657)]"
             >
-              Open
+              Go to Manage Products
             </Link>
             <Link
-              to="/admin/add-product"
-              className="px-3 py-2 rounded-xl font-semibold
-                         bg-[color-mix(in_srgb,var(--text,#111)_8%,transparent)]
-                         text-[var(--text)] hover:bg-[color-mix(in_srgb,var(--text,#111)_14%,transparent)]"
+              to="/admin/products#add"
+              className="px-3 py-2 rounded-xl font-semibold text-white
+                         bg-[color-mix(in_srgb,var(--brand,#2E6F6C)_85%,#1F2937)] hover:bg-[var(--brand-600,#2F6657)]"
             >
-              Full Add Form
+              Add Product
             </Link>
           </div>
         </div>
@@ -58,7 +58,7 @@ export default function AdminDashboard() {
         <div className="rounded-2xl border border-[var(--border,#E5E7EB)]/60 bg-[var(--surface,#fff)]/60 dark:bg-white/5 p-4">
           <h3 className="text-lg font-semibold text-[var(--text)]">Users</h3>
           <p className="text-sm text-[var(--muted)] mt-1">
-            View customers and manage admin access.
+            View customers, switch roles, and manage access.
           </p>
           <Link
             to="/admin/users"

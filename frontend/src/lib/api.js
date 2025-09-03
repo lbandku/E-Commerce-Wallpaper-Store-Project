@@ -1,26 +1,30 @@
 // frontend/src/lib/api.js
 import axios from "axios";
-import { API_BASE } from "./apiBase.js";   // 👈 import the helper
+import { API_BASE } from "./apiBase.js";
 
-export const api = axios.create({
+const api = axios.create({
   baseURL: API_BASE,
-  withCredentials: true, // for cookies/sessions
+  withCredentials: true, // keep if backend uses cookies; works with Bearer too
   headers: { "Content-Type": "application/json" },
 });
 
-// Always attach latest token (helps after Stripe redirect/refresh)
+// Read token from whichever key app uses
+function getToken() {
+  return (
+    localStorage.getItem("token") || // common in app
+    localStorage.getItem("jwt")   || // current attempt
+    localStorage.getItem("authToken") || // extra fallback
+    ""
+  );
+}
+
+// Attach latest token (helps after Stripe redirect/refresh)
 api.interceptors.request.use((config) => {
-  // Make sure this key matches what is stored in AuthContext (e.g., "token")
-  const token = localStorage.getItem("token"); 
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  } else {
-    delete config.headers.Authorization;
-  }
+  const token = getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  else delete config.headers.Authorization;
   return config;
 });
 
 export default api;
-
-
-
+export { api };

@@ -1,6 +1,6 @@
 // frontend/src/App.jsx
 import React, { useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import Navbar from "./components/Navbar.jsx";
 import Footer from "./components/Footer.jsx";
@@ -13,13 +13,12 @@ import AdminDashboard from "./pages/AdminDashboard.jsx";
 import Orders from "./pages/Orders.jsx";
 import CheckoutSuccess from "./pages/CheckoutSuccess.jsx";
 import CheckoutCancel from "./pages/CheckoutCancel.jsx";
-import Cart from "./pages/Cart.jsx";                    // ✅
+import Cart from "./pages/Cart.jsx";
 import MyOrders from "./pages/MyOrders.jsx";
 import AdminUsers from "./pages/AdminUsers.jsx";
 import Account from "./pages/Account.jsx";
 import AdminLogin from "./pages/AdminLogin.jsx";
 import NotFound from "./pages/NotFound.jsx";
-import AddProduct from "./pages/AddProduct.jsx";
 import AdminProducts from "./pages/AdminProducts.jsx";
 
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
@@ -56,7 +55,7 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/success" element={<CheckoutSuccess />} />
               <Route path="/cancel" element={<CheckoutCancel />} />
-              <Route path="/cart" element={<Cart />} />   {/* ✅ restored */}
+              <Route path="/cart" element={<Cart />} />
 
               {/* Admin */}
               <Route
@@ -84,14 +83,6 @@ export default function App() {
                 }
               />
               <Route
-                path="/admin/add-product"
-                element={
-                  <ProtectedRoute role="admin">
-                    <AddProduct />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
                 path="/admin/products"
                 element={
                   <ProtectedRoute role="admin">
@@ -99,6 +90,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              {/* Redirect old add-product route to combined page section */}
+              <Route path="/admin/add-product" element={<Navigate to="/admin/products#add" replace />} />
 
               {/* Authenticated user */}
               <Route
@@ -136,7 +129,7 @@ export default function App() {
             duration: 2500,
             className:
               "rounded-xl border border-[var(--border,#E5E7EB)] bg-[var(--surface,#fff)]/95 " +
-              "text-[var(--text,#111)] shadow-sm dark:bg:white/10 dark:text-[var(--text,#F3F4F6)] backdrop-blur-sm",
+              "text-[var(--text,#111)] shadow-sm dark:bg-white/10 dark:text-[var(--text,#F3F4F6)] backdrop-blur-sm",
             success: { iconTheme: { primary: "var(--brand,#2E6F6C)", secondary: "#fff" } },
             error: { iconTheme: { primary: "#EF4444", secondary: "#fff" } },
             loading: { iconTheme: { primary: "var(--brand,#2E6F6C)", secondary: "#fff" } },
