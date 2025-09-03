@@ -12,15 +12,9 @@ const DEV_USERS_BASE =
   "https://e-commerce-wallpaper-store-project.onrender.com";
 const u = (path) => (import.meta.env.DEV ? `${DEV_USERS_BASE}${path}` : path);
 
-/** Endpoints to probe on Render (dev only). */
+/** Endpoints to probe on Render. */
 const USER_LIST_PATHS = [
-  "/users",
-  "/api/users",
   "/api/admin/users",
-  "/api/users/list",
-  "/api/admin/users/list",
-  "/api/admin/list-users",
-  "/api/admin/get-users",
 ];
 
 /** Normalize shapes into consistent array. */
@@ -127,8 +121,8 @@ export default function AdminUsers() {
   const resolveUsersListPath = async () => {
     if (basePath) return basePath;
     if (!import.meta.env.DEV) {
-      setBasePath("/users");
-      return "/users";
+      setBasePath("/api/admin/users");
+      return "/api/admin/users";
     }
     for (const path of USER_LIST_PATHS) {
       try {
